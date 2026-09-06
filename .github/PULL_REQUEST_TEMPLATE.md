@@ -1,9 +1,19 @@
-## Description
-Describe your changes here.
+## 개요 (Overview)
+- 작업 내용에 대한 간략한 설명을 작성해주세요.
 
-## Related Issue
-Fixes # (issue number)
+## 주요 변경 사항 (Changes)
+- 주요 변경점 및 구현 세부사항을 목록으로 작성해주세요.
+  - 
 
-## Checklist
-- [ ] I have tested my changes
-- [ ] Code follows project standards
+## 관련 이슈 (Related Issues)
+- Closes #
+- Related to #
+
+## 테스트 및 검증 결과 (Verification)
+- [ ] 로컬 또는 테스트 환경에서 정상 동작을 확인했습니다.
+- [ ] 관련 단위/통합 테스트 또는 매니페스트 문법 검증을 통과했습니다.
+
+## 체크리스트 (Checklist)
+- [ ] 커밋 메시지 컨벤션을 준수했습니다.
+- [ ] 불필요한 설정 파일이나 디버깅 코드가 포함되지 않았습니다.
+- [ ] 변경 사항에 대한 문서화(README 또는 주석)를 완료했습니다.
