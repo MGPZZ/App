@@ -1,0 +1,48 @@
+name: Build and push application images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/ecr-images.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - context: src/frontend
+            image: frontend_ecr
+          - context: src/accounts/userservice
+            image: userservice_ecr
+          - context: src/accounts/contacts
+            image: contacts_ecr
+          - context: src/ledger/balancereader
+            image: balancereader_ecr
+          - context: src/ledger/ledgerwriter
+            image: ledgerwriter_ecr
+          - context: src/ledger/transactionhistory
+            image: transactionhistory_ecr
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.MINKI_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MINKI_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:latest
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:sha-${{ github.sha }}

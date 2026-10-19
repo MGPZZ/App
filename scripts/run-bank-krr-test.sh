@@ -3,8 +3,8 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-DEPLOY_REPO="${BANK_DEPLOY_REPO:-$ROOT_DIR/../mak-argocd-deploy}"
-CHART_DIR="${BANK_CHART_DIR:-$DEPLOY_REPO/charts/mak-app}"
+DEPLOY_REPO="${BANK_DEPLOY_REPO:-$ROOT_DIR/../GitOps}"
+CHART_DIR="${BANK_CHART_DIR:-$DEPLOY_REPO/charts/app}"
 SCENARIO_FILE="$CHART_DIR/files/bank-of-anthos-long-run.js"
 RESULTS_ROOT="${BANK_RESULTS_ROOT:-$ROOT_DIR/tests/k6/results}"
 NAMESPACE="${BANK_NAMESPACE:-frontend}"
@@ -40,7 +40,7 @@ PORT_FORWARD_PID=""
 SCALE_IN_GUARD_ACTIVE=0
 SCALE_IN_GUARD_STATE_FILE=""
 SCALE_IN_GUARD_OBJECTS=(
-  "frontend/frontend-chronos-scaler"
+  "frontend/frontend-scaler"
   "backend/balancereader-scaler"
   "backend/contacts-scaler"
   "backend/ledgerwriter-scaler"
@@ -76,7 +76,7 @@ Makefile 단축 명령:
 주요 선택 환경변수:
   RUN_ID                 실행 ID(미지정 시 UTC 시각으로 자동 생성)
   DB_STATE_ID            PRE/POST에서 필수인 동일 DB snapshot/seed 식별자
-  BANK_DEPLOY_REPO       기본값: ../mak-argocd-deploy
+  BANK_DEPLOY_REPO       기본값: ../GitOps
   EQUIVALENCE_FILE       직접 작성한 동등성 metadata JSON
   PROMETHEUS_URL         외부 URL 사용 시 PROMETHEUS_PORT_FORWARD=0도 설정
   COPY_RAW=1             큰 k6 raw JSON도 PVC에서 복사
@@ -214,10 +214,10 @@ preflight() {
   kubectl cluster-info >/dev/null
   kubectl get namespace "$NAMESPACE" >/dev/null
   kubectl -n "$NAMESPACE" get secret "$CREDENTIALS_SECRET" >/dev/null
-  kubectl -n "$NAMESPACE" get service mak-app-active >/dev/null
-  kubectl -n "$NAMESPACE" get endpoints mak-app-active \
+  kubectl -n "$NAMESPACE" get service frontend-active >/dev/null
+  kubectl -n "$NAMESPACE" get endpoints frontend-active \
     -o jsonpath='{.subsets[0].addresses[0].ip}' | grep -q . \
-    || die "mak-app-active Service에 Ready endpoint가 없습니다"
+    || die "frontend-active Service에 Ready endpoint가 없습니다"
   kubectl -n "$PROMETHEUS_NAMESPACE" get "$PROMETHEUS_SERVICE" >/dev/null
   kubectl -n "$PROMETHEUS_NAMESPACE" get endpoints "${PROMETHEUS_SERVICE#service/}" \
     -o jsonpath='{.subsets[0].addresses[0].ip}' | grep -q . \
@@ -231,10 +231,10 @@ preflight() {
     deployment/ledgerwriter \
     deployment/transactionhistory >/dev/null
 
-  if kubectl -n "$NAMESPACE" get rollout mak-app-rollout >/dev/null 2>&1; then
+  if kubectl -n "$NAMESPACE" get rollout frontend-rollout >/dev/null 2>&1; then
     local paused rollout_phase
-    paused="$(kubectl -n "$NAMESPACE" get rollout mak-app-rollout -o jsonpath='{.spec.paused}')"
-    rollout_phase="$(kubectl -n "$NAMESPACE" get rollout mak-app-rollout -o jsonpath='{.status.phase}')"
+    paused="$(kubectl -n "$NAMESPACE" get rollout frontend-rollout -o jsonpath='{.spec.paused}')"
+    rollout_phase="$(kubectl -n "$NAMESPACE" get rollout frontend-rollout -o jsonpath='{.status.phase}')"
     [[ "$paused" != "true" ]] || die "frontend Rollout이 pause 상태입니다"
     [[ "$rollout_phase" == "Healthy" ]] \
       || die "frontend Rollout 상태가 Healthy가 아닙니다: ${rollout_phase:-unknown}"
