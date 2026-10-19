@@ -2,7 +2,7 @@ name: Build and push application images
 
 on:
   push:
-    branches: [main]
+    branches: [github_action]
     paths:
       - "src/**"
       - ".github/workflows/ecr-images.yml"
