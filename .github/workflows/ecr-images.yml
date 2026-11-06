@@ -1,0 +1,53 @@
+name: Build and push application images
+
+on:
+  push:
+    branches: [github_action]
+    paths:
+      - "src/**"
+      - ".github/workflows/ecr-images.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - context: src/frontend
+            image: frontend_ecr
+          - context: src/accounts/userservice
+            image: userservice_ecr
+          - context: src/accounts/contacts
+            image: contacts_ecr
+          - context: src/ledger/balancereader
+            image: balancereader_ecr
+          - context: src/ledger/ledgerwriter
+            image: ledgerwriter_ecr
+          - context: src/ledger/transactionhistory
+            image: transactionhistory_ecr
+          - context: src/components/finops
+            image: krr-analyzer
+            # Keep aligned with GitOps charts/finops/values.yaml image.tag.
+            version: v0.1.36
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.MINKI_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MINKI_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:latest
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:sha-${{ github.sha }}
+            ${{ matrix.version && format('{0}/{1}:{2}', steps.ecr.outputs.registry, matrix.image, matrix.version) || '' }}
