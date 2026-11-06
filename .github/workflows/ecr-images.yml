@@ -25,8 +25,24 @@ jobs:
             image: ledgerwriter_ecr
           - context: src/ledger/transactionhistory
             image: transactionhistory_ecr
+          - context: src/components/finops
+            image: krr-analyzer
+            # Keep aligned with GitOps charts/finops/values.yaml image.tag.
+            version: v0.1.36
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        if: matrix.image == 'krr-analyzer'
+        with:
+          python-version: '3.11'
+
+      - name: Test FinOps Analyzer
+        if: matrix.image == 'krr-analyzer'
+        working-directory: ${{ matrix.context }}
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pytest tests -q
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -46,3 +62,4 @@ jobs:
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:latest
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:sha-${{ github.sha }}
+            ${{ matrix.version && format('{0}/{1}:{2}', steps.ecr.outputs.registry, matrix.image, matrix.version) || '' }}
