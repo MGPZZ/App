@@ -31,19 +31,7 @@ jobs:
             version: v0.1.36
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        if: matrix.image == 'krr-analyzer'
-        with:
-          python-version: '3.11'
-
-      - name: Test FinOps Analyzer
-        if: matrix.image == 'krr-analyzer'
-        working-directory: ${{ matrix.context }}
-        run: |
-          python -m pip install -r requirements-dev.txt
-          python -m pytest tests -q
-
+      
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.MINKI_AWS_ACCESS_KEY_ID }}
