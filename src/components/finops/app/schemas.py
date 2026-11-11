@@ -48,13 +48,7 @@ class PrometheusMetrics(BaseModel):
     avg_cpu_usage_pct: Optional[float] = Field(default=None, description="최근 평균 CPU 사용률 (%)")
     throttled: bool = Field(default=False, description="최근 24시간 내 CPU Throttling 발생 여부")
 
-# 6. Chronos-2 예측 데이터 스키마
-class ChronosForecast(BaseModel):
-    predicted_max_cpu_pct: Optional[float] = Field(default=None, description="향후 10분 내 예측 CPU 최대치 (%)")
-    predicted_max_mem_pct: Optional[float] = Field(default=None, description="향후 10분 내 예측 메모리 최대치 (%)")
-    predicted_req_per_sec: Optional[float] = Field(default=None, description="향후 10분 내 예측 초당 요청 수 (req/s)")
-
-# 7. 최종 분석 결과 및 텔레그램 연동을 위한 응답 스키마
+# 6. 최종 분석 결과 및 텔레그램 연동을 위한 응답 스키마
 class AnalysisResponse(BaseModel):
     deployment_name: str = Field(..., description="대상 Deployment 이름")
     namespace: str = Field(..., description="대상 Namespace")

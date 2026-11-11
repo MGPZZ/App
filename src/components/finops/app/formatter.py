@@ -64,7 +64,7 @@ class ReportFormatter:
             f"| KRR     | {krr_cpu_display:<8} | {krr_mem_display:<8} |",
             f"| Final   | {recommendations.final.cpu:<8} | {recommendations.final.memory:<8} |",
             "</pre>",
-            "<i>※ Final은 KRR 추천값에 운영 정책 및 Chronos 미래 예측을 적용해 자동 보정한 값입니다.</i>",
+            "<i>※ Final은 KRR 추천값에 안전 운영 정책을 적용해 자동 보정한 값입니다.</i>",
             "",
             "💰 <b>예상 리소스 및 비용 변화율</b>",
             _resource_change_line("CPU", cpu_reduction_pct),

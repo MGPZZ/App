@@ -8,9 +8,9 @@ from typing import Dict, Optional, Tuple
 from fastapi import FastAPI, HTTPException, status
 from app.schemas import (
     AnalysisRequest, AnalysisResponse, NamespaceAnalysisRequest, NamespaceAnalysisResponse,
-    BatchAnalysisRequest, ResourceSpec, PrometheusMetrics, ChronosForecast
+    BatchAnalysisRequest, ResourceSpec, PrometheusMetrics
 )
-from app.clients import KrrClient, PrometheusClient, ChronosClient, TelegramClient, TgGatewayClient, KrrDbClient
+from app.clients import KrrClient, PrometheusClient, TelegramClient, TgGatewayClient, KrrDbClient
 from app.engine import PolicyEngine, parse_cpu, parse_memory
 from app.formatter import ReportFormatter
 
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="AI 기반 FinOps 정책 분석 엔진 API",
-    description="KRR 추천값 및 Prometheus/Chronos-2 메트릭을 분석하여 최적의 안전 리소스 권장안을 생성하고 텔레그램 승인 알림을 발송하는 정책 엔진 API",
+    description="KRR 추천값 및 Prometheus 메트릭을 분석하여 최적의 안전 리소스 권장안을 생성하고 텔레그램 승인 알림을 발송하는 정책 엔진 API",
     version="1.2.0"
 )
 
@@ -49,7 +49,6 @@ app = FastAPI(
 # MOCK_INTEGRATION 기본값은 false(실제 모드) — clients.py와 동일한 이유
 MOCK_INTEGRATION = os.getenv("MOCK_INTEGRATION", "false").lower() == "true"
 PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://thanos-query.monitoring.svc.cluster.local:9090")
-CHRONOS_URL = os.getenv("CHRONOS_URL", "http://chronos-model.monitoring.svc.cluster.local:8000")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -61,7 +60,6 @@ TG_GATEWAY_URL = os.getenv("TG_GATEWAY_URL", "http://tg-gateway-service.monitori
 # 클라이언트 인스턴스화 (KRR은 별도 서비스가 아닌 내부 CLI로 실행되므로 prometheus_url을 전달)
 krr_client = KrrClient(PROMETHEUS_URL)
 prom_client = PrometheusClient(PROMETHEUS_URL)
-chronos_client = ChronosClient(CHRONOS_URL)
 telegram_client = TelegramClient(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 tg_gateway_client = TgGatewayClient(TG_GATEWAY_URL)
 krr_db_client = KrrDbClient()
@@ -139,7 +137,7 @@ def readiness_check():
 
 async def _run_analysis(deployment_name: str, namespace: str, send_telegram: bool, container_name: Optional[str] = None, history_duration: Optional[str] = None, krr_data: dict = None) -> AnalysisResponse:
     """
-    단일 워크로드에 대한 KRR/Prometheus/Chronos-2 데이터 수집, 정책 엔진 평가,
+    단일 워크로드에 대한 KRR/Prometheus 데이터 수집, 정책 엔진 평가,
     리포트 포맷팅, 텔레그램 발송까지 수행하는 공통 분석 로직입니다.
     /analyze(단일 대상)와 /analyze/namespace(네임스페이스 전수 분석)가 이 함수를 공유합니다.
 
@@ -195,25 +193,13 @@ async def _run_analysis(deployment_name: str, namespace: str, send_telegram: boo
     else:
         prom_metrics = None
 
-    # 3. Chronos-2 예측 데이터 수집
-    chronos_raw = chronos_client.get_future_forecast(deployment_name, namespace)
-    if chronos_raw is not None:
-        chronos_forecast = ChronosForecast(
-            predicted_max_cpu_pct=chronos_raw.get("predicted_max_cpu_pct"),
-            predicted_max_mem_pct=chronos_raw.get("predicted_max_mem_pct"),
-            predicted_req_per_sec=chronos_raw.get("predicted_req_per_sec")
-        )
-    else:
-        chronos_forecast = None
-
-    # 4. 정책 엔진 평가 수행
+    # 3. 정책 엔진 평가 수행
     risk_score, overall_status, recommendations, policy_evals, cost_savings_pct, cost_savings_amount, current_cost, final_cost = policy_engine.evaluate_optimization(
         deployment_name=deployment_name,
         namespace=namespace,
         current_res=current_spec,
         krr_res=krr_spec,
         prom_metrics=prom_metrics,
-        chronos_forecast=chronos_forecast,
         cpu_data_insufficient=cpu_data_insufficient,
         mem_data_insufficient=mem_data_insufficient,
         cpu_limit_str=krr_current_limits.get("cpu"),
@@ -398,7 +384,7 @@ async def analyze_namespace(request: NamespaceAnalysisRequest):
     """
     네임스페이스 내 KRR이 발견한 모든 워크로드를 전수 분석합니다.
     KRR CLI는 -n <namespace> 실행 시 이미 네임스페이스 전체를 스캔하므로, 이를 한 번만 실행하고
-    발견된 각 워크로드에 대해 Prometheus/Chronos-2 조회 및 정책 평가를 개별 수행합니다.
+    발견된 각 워크로드에 대해 Prometheus 조회 및 정책 평가를 개별 수행합니다.
     CronJob에서 targetDeployment 하나만 호출하던 기존 한계를 해소하기 위한 엔드포인트입니다.
     """
     logger.info(f"Received namespace-wide analysis request: namespace='{request.namespace}' (send_telegram={request.send_telegram})")

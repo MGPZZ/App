@@ -393,44 +393,6 @@ class PrometheusClient:
             logger.debug(f"[PrometheusClient] Query '{query}' failed: {e}")
         return None
 
-class ChronosClient:
-    def __init__(self, chronos_url: str = ""):
-        self.chronos_url = chronos_url.rstrip("/")
-
-    def get_future_forecast(self, deployment_name: str, namespace: str) -> Optional[dict]:
-        """
-        Chronos-2 시계열 예측 모델로부터 향후 10분간의 예상 최대 CPU 부하, 메모리 부하, 트래픽을 조회합니다.
-        """
-        if MOCK_INTEGRATION:
-            logger.info(f"[ChronosClient] Mock Mode - Generating mock data for {deployment_name}")
-            if deployment_name == "traffic-spike-api":
-                return {
-                    "predicted_max_cpu_pct": 92.0,  # CPU 92% 폭증 예측 시나리오
-                    "predicted_max_mem_pct": 80.0,
-                    "predicted_req_per_sec": 4500.0
-                }
-            else: # 일반 정상 최적화 케이스
-                return {
-                    "predicted_max_cpu_pct": 42.0,
-                    "predicted_max_mem_pct": 50.0,
-                    "predicted_req_per_sec": 1200.0
-                }
-
-        logger.info(f"[ChronosClient] Real API Call -> {self.chronos_url}/predict/{namespace}/{deployment_name}")
-        try:
-            url = f"{self.chronos_url}/predict/{namespace}/{deployment_name}"
-            resp = requests.get(url, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                return {
-                    "predicted_max_cpu_pct": float(data["predicted_max_cpu_pct"]) if data.get("predicted_max_cpu_pct") is not None else None,
-                    "predicted_max_mem_pct": float(data["predicted_max_mem_pct"]) if data.get("predicted_max_mem_pct") is not None else None,
-                    "predicted_req_per_sec": float(data["predicted_req_per_sec"]) if data.get("predicted_req_per_sec") is not None else None
-                }
-        except Exception as e:
-            logger.error(f"[ChronosClient] Error calling Chronos API: {e}")
-
-        return None
 
 class TelegramClient:
     """

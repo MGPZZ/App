@@ -1,7 +1,7 @@
 import re
 import logging
 from typing import Tuple, List, Optional
-from app.schemas import ResourceSpec, RecommendationData, PolicyResult, PrometheusMetrics, ChronosForecast
+from app.schemas import ResourceSpec, RecommendationData, PolicyResult, PrometheusMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,6 @@ class PolicyEngine:
         current_res: ResourceSpec,
         krr_res: ResourceSpec,
         prom_metrics: Optional[PrometheusMetrics],
-        chronos_forecast: Optional[ChronosForecast],
         cpu_data_insufficient: bool = False,
         mem_data_insufficient: bool = False,
         cpu_limit_str: Optional[str] = None,
@@ -207,37 +206,6 @@ class PolicyEngine:
                 description=f"재시작 횟수({prom_metrics.restart_count}회)가 기준치 미만으로 양호합니다."
             ))
 
-        # 정책 5: Chronos-2 예측 부하 반영 (향후 10분 내 CPU 부하 80% 이상 예측 시 최적화 제한 및 상향)
-        if chronos_forecast is not None and chronos_forecast.predicted_max_cpu_pct is not None:
-            if chronos_forecast.predicted_max_cpu_pct >= 80.0:
-                score += 45
-                # KEDA가 Chronos를 기반으로 HPA(파드 개수 스케일아웃)를 수행할 예정이므로,
-                # 파드 개별 스펙(수직)까지 Scale-Up 하면 이중 스케일링으로 비용이 낭비됩니다.
-                # 따라서 스펙 감축만 취소(현재 스펙 유지)하고 HPA에 확장을 위임합니다.
-                final_cpu = curr_cpu
-                policy_evals.append(PolicyResult(
-                    rule_id="RULE_05",
-                    name="Chronos-2 미래 부하 예측 검사",
-                    status="WARN",
-                    description=f"향후 10분 내 예측 부하가 {chronos_forecast.predicted_max_cpu_pct}%로 급증합니다. KEDA의 안전한 파드 스케일아웃(HPA)을 방해하지 않도록 스펙 감축을 보류하고 현재 CPU를 유지합니다."
-                ))
-            else:
-                policy_evals.append(PolicyResult(
-                    rule_id="RULE_05",
-                    name="Chronos-2 미래 부하 예측 검사",
-                    status="PASS",
-                    description=f"향후 10분 내 예상 CPU 최대 로드({chronos_forecast.predicted_max_cpu_pct}%)가 안정 범위에 있어 감축 적용이 가능합니다."
-                ))
-        else:
-            score += 30
-            final_cpu = max(final_cpu, curr_cpu * 0.85)
-            policy_evals.append(PolicyResult(
-                rule_id="RULE_05",
-                name="Chronos-2 미래 부하 예측 검사",
-                status="WARN",
-                description="Chronos-2 시계열 예측 메트릭을 수집하지 못했습니다. 안전을 위해 감축 마진을 보수적으로 제한(기존 리소스의 85% 이상 유지)합니다."
-            ))
-
         # 정책 6: 평균 CPU 로드 안정성 체크
         if prom_metrics is not None and prom_metrics.avg_cpu_usage_pct is not None and prom_metrics.avg_cpu_usage_pct < 20.0 and not prom_metrics.oom_killed:
             score = max(0, score - 15)
@@ -344,7 +312,7 @@ class PolicyEngine:
         
         # --- 예상 비용 변화율 계산 ---
         # 부호 있는 값으로 계산합니다: 양수 = 비용 절감, 음수 = 비용 증가.
-        # Chronos-2 예측(RULE_05)으로 인해 스펙이 오히려 상향된 경우, 이를 0%로 뭉개면
+        # 스펙이 오히려 상향된 경우, 이를 0%로 뭉개면
         # 운영자가 비용 증가 상황을 인지하지 못하므로 절대 max(0.0, ...)로 클램핑하지 않습니다.
         current_cost = (curr_cpu * CPU_UNIT_COST) + ((curr_mem / 1024.0) * MEM_UNIT_COST)
         final_cost = (final_cpu * CPU_UNIT_COST) + ((final_mem / 1024.0) * MEM_UNIT_COST)
