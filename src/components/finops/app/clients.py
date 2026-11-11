@@ -350,16 +350,21 @@ class PrometheusClient:
             container_filter = f', container="{container_name}"' if container_name else ''
             usage_filter = container_filter or ', container!="", container!="POD"'
             # 1. OOM Killed 이벤트 쿼리
-            oom_query = f'sum(increase(kube_pod_container_status_terminated_reason{{namespace="{namespace}", pod=~"{pod_regex}"{container_filter}, reason="OOMKilled"}}[24h]))'
+            # kube_pod_container_status_last_terminated_reason은 게이지(상태값)이므로 increase() 대신
+            # max_over_time[24h]을 확인하거나 cAdvisor의 container_oom_events_total 증가분을 감지합니다.
+            oom_query = (
+                f'(sum(max_over_time(kube_pod_container_status_last_terminated_reason{{namespace="{namespace}", pod=~"{pod_regex}"{container_filter}, reason="OOMKilled"}}[24h])) or '
+                f'sum(increase(container_oom_events_total{{namespace="{namespace}", pod=~"{pod_regex}"{usage_filter}}}[24h])))'
+            )
             oom_res = self._query_prometheus(oom_query)
             if oom_res and oom_res > 0:
                 metrics["oom_killed"] = True
 
-            # 2. Pod 재시작 횟수 쿼리
-            restart_query = f'sum(kube_pod_container_status_restarts_total{{namespace="{namespace}", pod=~"{pod_regex}"{container_filter}}})'
+            # 2. Pod 재시작 횟수 쿼리 (영구 누적치가 아닌 최근 24시간 증가분 기준)
+            restart_query = f'sum(increase(kube_pod_container_status_restarts_total{{namespace="{namespace}", pod=~"{pod_regex}"{container_filter}}}[24h]))'
             restart_res = self._query_prometheus(restart_query)
             if restart_res is not None:
-                metrics["restart_count"] = int(restart_res)
+                metrics["restart_count"] = int(round(float(restart_res)))
 
             # 3. 평균 CPU 사용률 (%) 쿼리
             cpu_query = f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}", pod=~"{pod_regex}"{usage_filter}}}[5m])) / sum(kube_pod_container_resource_requests{{resource="cpu", namespace="{namespace}", pod=~"{pod_regex}"{container_filter}}}) * 100'

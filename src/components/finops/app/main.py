@@ -182,13 +182,14 @@ async def _run_analysis(deployment_name: str, namespace: str, send_telegram: boo
     # 이 값 이하로 캡 걸어, Kubernetes admission 거부로 인한 조용한 무한 재시도를 방지합니다.
     krr_current_limits = krr_data.get("current_limits") or {}
 
-    # 2. Prometheus 최근 이력 메트릭 수집 (OOM, Restart, Avg Load)
+    # 2. Prometheus 최근 이력 메트릭 수집 (OOM, Restart, Avg Load, Throttling)
     prom_raw = prom_client.get_workload_metrics(deployment_name, namespace, container_name)
     if prom_raw is not None:
         prom_metrics = PrometheusMetrics(
             oom_killed=prom_raw.get("oom_killed", False),
             restart_count=prom_raw.get("restart_count", 0),
-            avg_cpu_usage_pct=prom_raw.get("avg_cpu_usage_pct")
+            avg_cpu_usage_pct=prom_raw.get("avg_cpu_usage_pct"),
+            throttled=prom_raw.get("throttled", False)
         )
     else:
         prom_metrics = None
