@@ -27,7 +27,6 @@ jobs:
             image: transactionhistory_ecr
           - context: src/components/finops
             image: krr-analyzer
-            # Keep aligned with GitOps charts/finops/values.yaml image.tag.
             version: v0.1.36
     steps:
       - uses: actions/checkout@v4
